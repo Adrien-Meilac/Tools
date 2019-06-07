@@ -1,8 +1,26 @@
-Attribute VB_Name = "TOOL_SPLITEX"
+Attribute VB_Name = "TOOL_FORMAT_STRING"
+'Version 1 (2019-04-30)
+'Contiens les fonctions
+'   -> Printf
+'   -> SplitEx
+
 Option Explicit
 Option Base 0
 
-Function SplitEx(InString As String, _
+Public Function Printf(mask As String, ParamArray tokens()) _
+As String
+    ' Fonction qui formate les chaînes de caractère
+    ' synthaxe : printf("essai {0}, valeur = {1}", valeur0, valeur1) peut importe le type des éléments
+    Dim i As Long
+    Dim i_min As Long: i_min = LBound(tokens)
+    Dim i_max As Long: i_max = UBound(tokens)
+    For i = i_min To i_max
+        mask = replace$(mask, "{" & i & "}", tokens(i))
+    Next
+    Printf = mask
+End Function
+
+Public Function SplitEx(InString As String, _
                     Delimiter As String, _
                     Optional GroupChar As String = vbNullString, _
                     Optional IgnoreConsecutiveDelimiters As Boolean = False, _
@@ -64,7 +82,7 @@ As String()
     Dim Arr() As String
     Dim N As Long
     Dim InGroupReplace As String
-    Dim S As String
+    Dim s As String
     Dim Done As Boolean
     Dim M As Long
     Dim EscapeReplace As String
@@ -88,7 +106,7 @@ As String()
         Exit Function
     End If
     
-    S = InString
+    s = InString
     N = 1
     Done = False
     '
@@ -97,7 +115,7 @@ As String()
     ' a group of characters delimited by GroupChar.
     Do Until Done
         If StrComp(Chr(N), Delimiter, vbBinaryCompare) <> 0 Then
-            M = InStr(1, S, Chr(N), vbBinaryCompare)
+            M = InStr(1, s, Chr(N), vbBinaryCompare)
             If M = 0 Then
                 InGroupReplace = Chr(N)
                 Done = True
@@ -115,7 +133,7 @@ As String()
     If Escape <> vbNullString Then
         Do Until Done
             If StrComp(Chr(N), Escape, vbTextCompare) <> 0 Then
-                M = InStr(1, S, Chr(N), vbBinaryCompare)
+                M = InStr(1, s, Chr(N), vbBinaryCompare)
                 If M = 0 Then
                     EscapeReplace = Chr(N)
                     Done = True
@@ -129,17 +147,17 @@ As String()
     ' Replace existing escaped delimiters with the EscapeReplace
     ' character.
     If Escape <> vbNullString Then
-        S = Replace(S, Escape & Delimiter, EscapeReplace)
+        s = replace(s, Escape & Delimiter, EscapeReplace)
     End If
         
     '
     ' If we are ignoring consecutive delimiters, replace
     ' consecutive delimiters with a single delimiter.
     If IgnoreConsecutiveDelimiters = True Then
-        N = InStr(1, S, Delimiter & Delimiter, vbBinaryCompare)
+        N = InStr(1, s, Delimiter & Delimiter, vbBinaryCompare)
         Do Until N = 0
-            S = Replace(S, Delimiter & Delimiter, Delimiter)
-            N = InStr(1, S, Delimiter & Delimiter, vbBinaryCompare)
+            s = replace(s, Delimiter & Delimiter, Delimiter)
+            N = InStr(1, s, Delimiter & Delimiter, vbBinaryCompare)
         Loop
     End If
     
@@ -147,37 +165,39 @@ As String()
     ' Scan string and replace any delimter that occurs within
     ' a group sequence with InGroupReplace
     If Len(GroupChar) > 0 Then
-        For N = 1 To Len(S)
-            If Mid(S, N, Len(GroupChar)) = GroupChar Then
+        For N = 1 To Len(s)
+            If Mid(s, N, Len(GroupChar)) = GroupChar Then
                 InGroup = Not InGroup
             End If
-            If Mid(S, N, 1) = Delimiter Then
+            If Mid(s, N, 1) = Delimiter Then
                 If InGroup Then
-                    Mid(S, N, 1) = InGroupReplace
+                    Mid(s, N, 1) = InGroupReplace
                 End If
             End If
         Next N
     End If
     
     ' do the split
-    Arr = Split(S, Delimiter)
+    Arr = Split(s, Delimiter)
     ' loop through the array and replace our special control
     ' characters with their original value.
     For N = LBound(Arr) To UBound(Arr)
-        Arr(N) = Replace(Arr(N), InGroupReplace, Delimiter)
+        Arr(N) = replace(Arr(N), InGroupReplace, Delimiter)
         If DeleteGroupCharacters = True Then
-            Arr(N) = Replace(Arr(N), GroupChar, vbNullString)
+            Arr(N) = replace(Arr(N), GroupChar, vbNullString)
         End If
         If EscapeReplace <> vbNullString Then
             If RemoveEscape = True Then
-                Arr(N) = Replace(Arr(N), EscapeReplace, Delimiter)
+                Arr(N) = replace(Arr(N), EscapeReplace, Delimiter)
             Else
-                Arr(N) = Replace(Arr(N), EscapeReplace, Escape & Delimiter)
+                Arr(N) = replace(Arr(N), EscapeReplace, Escape & Delimiter)
             End If
         End If
     Next N
     SplitEx = Arr
 
 End Function
+
+
 
 
