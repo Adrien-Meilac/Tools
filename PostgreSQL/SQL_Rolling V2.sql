@@ -65,6 +65,7 @@ create aggregate rolling_stddev_with_offset(numeric, date, interval, interval)
     finalfunc = stddev_paire_array_num_array_date
 );
 
+
 create aggregate rolling_stddev(numeric, date, interval)
 (
     sfunc = array_append_without_offset,
@@ -117,7 +118,7 @@ returns double precision as $$
 select med_median("MT") from unnest(($1).dt, ($1).num) f("DT", "MT") where "DT" > ($1).curdt - ($1).os - ($1).iv and "DT" <= ($1).curdt - ($1).os;
 $$ language sql;
 
-create aggregate rolling_median_with_offset(double precision, date, interval, interval)
+create aggregate rolling_median_with_offset(numeric, date, interval, interval)
 (
     sfunc = array_append_with_offset,
     stype = paire_array_num_array_date,
@@ -125,13 +126,12 @@ create aggregate rolling_median_with_offset(double precision, date, interval, in
     finalfunc = median_paire_array_num_array_date
 );
 
-create aggregate rolling_median(double precision, date, interval)
+create aggregate rolling_median(numeric, date, interval)
 (
     sfunc = array_append_without_offset,
     stype = paire_array_num_array_date,
     finalfunc = median_paire_array_num_array_date
 );
-
 
 drop aggregate if exists rolling_percentile_with_offset(numeric, date, interval, interval, double precision);
 drop aggregate if exists rolling_percentile(numeric, date, interval, double precision);
