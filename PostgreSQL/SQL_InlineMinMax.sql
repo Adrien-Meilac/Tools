@@ -1,5 +1,5 @@
-drop function inlineMax(anyelement, anyelement) cascade;
-drop function inlineMin(anyelement, anyelement) cascade;
+drop function if exists inlineMax(anyelement, anyelement);
+drop function if exists inlineMin(anyelement, anyelement);
 
 create or replace function inlineMax(anyelement, anyelement)
 returns anyelement

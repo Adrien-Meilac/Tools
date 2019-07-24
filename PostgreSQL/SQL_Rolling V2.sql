@@ -113,11 +113,11 @@ create aggregate rolling_count(numeric, date, interval)
 );
 
 create function median_paire_array_num_array_date(paire_array_num_array_date)
-returns numeric as $$
-select med_median("MT"::int) from unnest(($1).dt, ($1).num) f("DT", "MT") where "DT" > ($1).curdt - ($1).os - ($1).iv and "DT" <= ($1).curdt - ($1).os;
+returns double precision as $$
+select med_median("MT") from unnest(($1).dt, ($1).num) f("DT", "MT") where "DT" > ($1).curdt - ($1).os - ($1).iv and "DT" <= ($1).curdt - ($1).os;
 $$ language sql;
 
-create aggregate rolling_median_with_offset(numeric, date, interval, interval)
+create aggregate rolling_median_with_offset(double precision, date, interval, interval)
 (
     sfunc = array_append_with_offset,
     stype = paire_array_num_array_date,
@@ -125,7 +125,7 @@ create aggregate rolling_median_with_offset(numeric, date, interval, interval)
     finalfunc = median_paire_array_num_array_date
 );
 
-create aggregate rolling_median(numeric, date, interval)
+create aggregate rolling_median(double precision, date, interval)
 (
     sfunc = array_append_without_offset,
     stype = paire_array_num_array_date,
