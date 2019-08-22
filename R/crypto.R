@@ -36,8 +36,8 @@ write_file(x = ciphertext, path = crypted_key)
 write_file(x = rawToChar(iv), path = file_iv)
 
 # Decrypt
-input = "main_C.pdf"
-output = "main_C_C.pdf"
+input = "Documentation.tar"
+output = "CR.tar"
 crypted_key = "K1.txt"
 file_iv = "iv.txt"
 private_key = "private key.txt"
