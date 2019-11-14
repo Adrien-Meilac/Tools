@@ -17,3 +17,15 @@ def makePdf(pdfFileName, listPages, dir = ''):
         pdf.image(dir + str(page) + ".jpg", 0, 0)
 
     pdf.output(dir + pdfFileName + ".pdf", "F")
+    
+    
+#Autre solution :
+#from PIL import Image
+#
+#im_list = []
+#for l in L:
+#    im_list.append(Image.open(l))
+#
+#pdf1_filename = "bbd1.pdf"
+#
+#im_list[0].save(pdf1_filename, "PDF" ,resolution=100.0, save_all=True, append_images=im_list[1:])
