@@ -14,9 +14,15 @@ As String
     Dim i As Long
     Dim i_min As Long: i_min = LBound(tokens)
     Dim i_max As Long: i_max = UBound(tokens)
-    For i = i_min To i_max
-        mask = replace$(mask, "{" & i & "}", tokens(i))
-    Next
+    If InStr(mask, "{}") < 0 Then
+        For i = i_min To i_max
+            mask = Replace$(mask, "{" & i & "}", CStr(tokens(i)))
+        Next
+    Else
+        For i = i_min To i_max
+            mask = Replace$(mask, "{}", CStr(tokens(i)), Count:=1)
+        Next
+    End If
     Printf = mask
 End Function
 
