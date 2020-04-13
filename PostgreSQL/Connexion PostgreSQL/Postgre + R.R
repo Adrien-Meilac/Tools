@@ -1,4 +1,4 @@
-require("RPostgreSQL")
+library(RPostgreSQL)
 
 user = "postgres"
 password = "1234"

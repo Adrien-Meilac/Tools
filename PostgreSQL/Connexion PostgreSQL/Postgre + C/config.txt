@@ -1,0 +1,2 @@
+compiler search directories: C:\Add\x64\PostgreSQL\12\include
+linker search directories: C:\Add\x64\PostgreSQL\12\bin
