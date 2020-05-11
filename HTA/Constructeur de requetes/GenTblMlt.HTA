@@ -1,0 +1,237 @@
+<HEAD lang="fr"> 
+<title>Visu resultat de la requête multipage</title>
+	<HTA:APPLICATION
+       id ="GenTblMlt"
+       applicationname ="GenTblMlt"
+       ICON ="MultiTBLHTA.ico"
+		version ="1"
+	>
+	<SCRIPT language="VBScript" type="text/vbscript">
+		ResizeTo 835,580
+		MoveTo (Screen.Width-835)/2,(Screen.Height - 685) / 2
+	</SCRIPT>
+</HEAD>
+'----------------------------------------------------------------------------------------------------------------------
+<SCRIPT language="VBScript" type="text/vbscript">
+'----------------------------------------------------------------------------------------------------------------------
+Dim Fso, F, ChemFichierTemp, ContenuLgn, MsGPage
+'----------------------------------------------------------------------------------------------------------------------
+Sub MouseExit(Lobjet)
+  Lobjet.Style.Color = "blue"
+  Lobjet.Style.cursor = "default"
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub MouseEnter(Lobjet)
+  Lobjet.Style.Color = "red"
+  Lobjet.Style.cursor = "pointer"
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub EnregJouerTbl()
+Const ForWriting = 2
+Set Fso = CreateObject("Scripting.FileSystemObject")
+Set F = Fso.OpenTextFile(ChemFichierTemp, ForWriting, True)
+F.Write MsGPage
+F.Close: Set F = Nothing: Set Fso = Nothing
+Dim WshShell
+Set WshShell = CreateObject("WScript.Shell")
+If InStr(1, ChemFichierTemp, Chr(32)) Then
+  WshShell.Run Chr(34) & ChemFichierTemp & Chr(34)
+  Else
+  WshShell.Run ChemFichierTemp
+End If
+Set WshShell = Nothing
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub RecupeVBScript()
+Const ForReading = 1
+Set Fso = CreateObject("Scripting.FileSystemObject")
+Set F = Fso.OpenTextFile(ChemFichierTemp, ForReading)
+ContenuLgn = Split(F.ReadAll, vbNewLine)
+F.Close: Set F = Nothing: Set Fso = Nothing
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub NewPage(Ndeb, Nfin)
+Const adUseClient = 3
+Const adModeReadWrite = 3
+Const AdBookmarkFirst = 1
+Const adLockPessimistic = 2
+Const adOpenStatic = 3
+Dim Cnx, Rst, SQLConnect, SQLTbl
+Dim NomDeLaBDs, NomDeLaTable
+Dim NBrEnrg, NbrPage, NumPage, AffNbrLgn
+Dim T, U, V
+'<---------- Debut des lignes generées par la sub CreatTblMultiple de OutilBDsAccess.HTA
+ChemFichierTemp = "C:\PersoFrancis\En VBScript et HTA\Essais HTAs\Constructeur de requetes\GenTblMlt.hta"
+NomDeLaBDs = "Bd2007.accdb": NomDeLaTable = "MSysNavPaneObjectIDs"
+SQLConnect = "PROVIDER=Microsoft.ACE.OLEDB.12.0;Data Source=C:\PersoFrancis\BD Access 20007\Bd2007.accdb;User Id=admin;Password=;"
+SQLTbl = "Select * From MSysNavPaneObjectIDs"
+AffNbrLgn = 25
+'**********************************************************************************************************************
+RecupeVBScript
+For T = 0 To 145: MsGPage = MsGPage & ContenuLgn(T) & vbCrLf: Next
+Set Cnx = CreateObject("ADODB.Connection"): Cnx.CursorLocation = adUseClient: Cnx.Mode = adModeReadWrite: Cnx.Open SQLConnect
+Set Rst = CreateObject("ADODB.Recordset"): Rst.Open SQLTbl, Cnx, adOpenStatic, adLockPessimistic
+NBrEnrg = Rst.RecordCount
+If Nfin = NBrEnrg Then U = Nfin Else U = Nfin + 1
+'-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*- partie <body> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+'--------- Infos nom de la BDs, nom de la table, N° enregistrement debut et fin pour la page à afficher -----------
+MsGPage = MsGPage & Left(ContenuLgn(T), (InStr(1, ContenuLgn(T), ">", vbTextCompare))) & Ndeb + 1 & Right(ContenuLgn(T), 5) & vbCrLf
+MsGPage = MsGPage & Left(ContenuLgn(T + 1), (InStr(1, ContenuLgn(T + 1), ">", vbTextCompare))) & U & Right(ContenuLgn(T + 1), 5) & vbCrLf
+MsGPage = MsGPage & Left(ContenuLgn(T + 2), (InStr(1, ContenuLgn(T + 2), ">", vbTextCompare))) & NBrEnrg & Right(ContenuLgn(T + 2), 10) & vbCrLf
+U = T + 3: V = U + 2: For T = U To V: MsGPage = MsGPage & ContenuLgn(T) & vbCrLf: Next
+MsGPage = MsGPage & ContenuLgn(T)
+'---------- ajout de chaque lignes et valeur de chaque enregistrements -----------
+Rst.Move Ndeb, AdBookmarkFirst
+U = Nfin - Ndeb
+For V = 0 To U
+        If Not Rst.EOF Then
+            MsGPage = MsGPage & vbCrLf & "    <tr>" & vbCrLf & "        <td style=" & Chr(34) & "background-color:#E0E0E0;color:green" & Chr(34) & ">&nbsp" & Ndeb + V + 1 & "&nbsp</td>"
+            For T = 0 To Rst.Fields.Count - 1
+				If Rst.Fields(T).Type = 205 then
+					On Error Resume Next: MsGPage = MsGPage & "<td>" & Cstr(Rst.Fields(T).GetChunk(1024)) & "</td>": If Err.Number <> 0 Then Err.Clear: MsGPage = MsGPage & "<td>?Err?</td>"
+					Else
+					On Error Resume Next: MsGPage = MsGPage & "<td>" & Rst.Fields(T) & "</td>": If Err.Number <> 0 Then Err.Clear: MsGPage = MsGPage & "<td>?Err?</td>"
+				End If
+            Next
+            MsGPage = MsGPage & vbCrLf & "    </tr>"
+        End If
+        If Rst.EOF Then Exit For Else Rst.MoveNext
+Next
+Rst.Close
+Set Rst = Nothing
+Cnx.Close
+Set Cnx = Nothing
+'--- Liens pour appel des pages suivantes ---
+NumPage = Int((Ndeb + 1) / AffNbrLgn) + 1
+NbrPage = Int((NBrEnrg - 1) / AffNbrLgn): T = (NBrEnrg - 1) / AffNbrLgn
+If T > NbrPage Then NbrPage = NbrPage + 1
+MsGPage = MsGPage & vbCrLf & "  <tr style=" & Chr(34) & "background-color:#E0E0E0" & Chr(34) & ">" & vbCrLf
+MsGPage = MsGPage & "       <td colspan=" & Chr(34) & NbrPage & Chr(34) & ">"
+For V = 1 To NbrPage
+    If V = NumPage Then
+        MsGPage = MsGPage & vbCrLf & "         <span style=" & Chr(34) & "color:#788C8C" & Chr(34) & ">" & V & "</span>"
+        Else
+		If V <> NbrPage Then
+            MsGPage = MsGPage & vbCrLf & "         <a id=" & Chr(34) & "Lien" & V & Chr(34) & " style=" & Chr(34) & "color:blue;text-Decoration:underline" & Chr(34) _
+            & " Title=" & Chr(34) & "Enregistrements: " & (((V - 1) * AffNbrLgn) + 1) & "/" & (V * AffNbrLgn) & Chr(34) _
+            & " onClick=" & Chr(34) & "NewPage " & ((V - 1) * AffNbrLgn) & "," & ((V * AffNbrLgn) - 1) & Chr(34) _
+            & " onmouseover=" & Chr(34) & "MouseEnter(Lien" & V & ")" & Chr(34) _
+            & " onmouseout=" & Chr(34) & "MouseExit(Lien" & V & ")" & Chr(34) _
+            & ">" & V & "</a>"
+            Else
+            T = NBrEnrg
+            MsGPage = MsGPage & vbCrLf & "         <a id=" & Chr(34) & "Lien" & V & Chr(34) & " style=" & Chr(34) & "color:blue;text-Decoration:underline" & Chr(34) _
+            & " Title=" & Chr(34) & "Enregistrements: " & (((V - 1) * AffNbrLgn) + 1) & "/" & T & Chr(34) _
+            & " onClick=" & Chr(34) & "NewPage " & ((V - 1) * AffNbrLgn) & "," & T & Chr(34) _
+            & " onmouseover=" & Chr(34) & "MouseEnter(Lien" & V & ")" & Chr(34) _
+            & " onmouseout=" & Chr(34) & "MouseExit(Lien" & V & ")" & Chr(34) _
+            & ">" & V & "</a>"
+        End If
+    End If
+Next
+V = UBound(ContenuLgn) - 4
+For T = V To UBound(ContenuLgn)
+         MsGPage = MsGPage & vbCrLf & ContenuLgn(T)
+Next
+'-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*- fin partie <body> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+EnregJouerTbl
+If chkClose.Checked Then window.Close()
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+</SCRIPT>
+'----------------------------------------------------------------------------------------------------------------------
+<body>
+<H5>Conserne la BDS: <em style="color: blue">Bd2007.accdb</em>
+&nbsp&nbsp&nbsp&nbspTable: <em style="color: blue">MSysNavPaneObjectIDs</em>
+&nbsp&nbsp&nbsp&nbspRequête: <em style="color: blue">Select * From MSysNavPaneObjectIDs</em><br>
+Enregistrements N° <em style="color: blue">1</em>
+ à <em style="color: blue">25</em>
+ sur <em style="color: red">32</em></H5>
+<table cellspacing="0" rules="all" border="1" style="border-collapse:collapse;">
+    <tr style="background-color:#E0E0E0">
+        <td>&nbsp&nbsp</td><td>&nbspId&nbsp</td><td>&nbspName&nbsp</td><td>&nbspType&nbsp</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp1&nbsp</td><td>251658241</td><td>Tables</td><td>3</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp2&nbsp</td><td>251658242</td><td>Databases</td><td>3</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp3&nbsp</td><td>251658243</td><td>Relationships</td><td>3</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp4&nbsp</td><td>268435456</td><td>MSysDb</td><td>2</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp5&nbsp</td><td>2</td><td>MSysObjects</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp6&nbsp</td><td>3</td><td>MSysACEs</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp7&nbsp</td><td>4</td><td>MSysQueries</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp8&nbsp</td><td>5</td><td>MSysRelationships</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp9&nbsp</td><td>18</td><td>MSysComplexColumns</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp10&nbsp</td><td>23</td><td>MSysComplexType_UnsignedByte</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp11&nbsp</td><td>25</td><td>MSysComplexType_Short</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp12&nbsp</td><td>27</td><td>MSysComplexType_Long</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp13&nbsp</td><td>29</td><td>MSysComplexType_IEEESingle</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp14&nbsp</td><td>31</td><td>MSysComplexType_IEEEDouble</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp15&nbsp</td><td>33</td><td>MSysComplexType_GUID</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp16&nbsp</td><td>35</td><td>MSysComplexType_Decimal</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp17&nbsp</td><td>37</td><td>MSysComplexType_Text</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp18&nbsp</td><td>39</td><td>MSysComplexType_Attachment</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp19&nbsp</td><td>43</td><td>MSysAccessStorage</td><td>1</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp20&nbsp</td><td>-2147483648</td><td>SummaryInfo</td><td>32779</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp21&nbsp</td><td>-2147483647</td><td>UserDefined</td><td>32779</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp22&nbsp</td><td>-2147483646</td><td>Forms</td><td>3</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp23&nbsp</td><td>-2147483645</td><td>Reports</td><td>3</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp24&nbsp</td><td>-2147483644</td><td>Scripts</td><td>3</td>
+    </tr>
+    <tr>
+        <td style="background-color:#E0E0E0;color:green">&nbsp25&nbsp</td><td>-2147483643</td><td>Modules</td><td>3</td>
+    </tr>
+  <tr style="background-color:#E0E0E0">
+       <td colspan="2">
+         <span style="color:#788C8C">1</span>
+         <a id="Lien2" style="color:blue;text-Decoration:underline" Title="Enregistrements: 26/32" onClick="NewPage 25,32" onmouseover="MouseEnter(Lien2)" onmouseout="MouseExit(Lien2)">2</a>
+  <tr style="background-color:#E0E0E0">
+  </tr>
+</table>
+	<INPUT Type="checkbox" name="chkClose" CHECKED><em style="color: green">Fermer cette page après mon nouveau choix</em>
+</body>

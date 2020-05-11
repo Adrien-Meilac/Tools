@@ -1,0 +1,158 @@
+<HEAD lang="fr"> 
+<title>Visu resultat de la requête multipage</title>
+	<HTA:APPLICATION
+		id ="StructGenTbl"
+		applicationname ="StructGenTbl"
+		ICON="TBLHTA.ico"
+		version ="1"
+	>
+	<SCRIPT language="VBScript" type="text/vbscript">
+		ResizeTo 835,580
+		MoveTo (Screen.Width-835)/2,(Screen.Height - 685) / 2
+	</SCRIPT>
+</HEAD>
+'----------------------------------------------------------------------------------------------------------------------
+<SCRIPT language="VBScript" type="text/vbscript">
+'----------------------------------------------------------------------------------------------------------------------
+Dim Fso, F, ChemFichierTemp, ContenuLgn, MsGPage
+'----------------------------------------------------------------------------------------------------------------------
+Sub MouseExit(Lobjet)
+  Lobjet.Style.Color = "blue"
+  Lobjet.Style.cursor = "default"
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub MouseEnter(Lobjet)
+  Lobjet.Style.Color = "red"
+  Lobjet.Style.cursor = "pointer"
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub EnregJouerTbl()
+Const ForWriting = 2
+Set Fso = CreateObject("Scripting.FileSystemObject")
+Set F = Fso.OpenTextFile(ChemFichierTemp, ForWriting, True)
+F.Write MsGPage
+F.Close: Set F = Nothing: Set Fso = Nothing
+Dim WshShell
+Set WshShell = CreateObject("WScript.Shell")
+If InStr(1, ChemFichierTemp, Chr(32)) Then
+  WshShell.Run Chr(34) & ChemFichierTemp & Chr(34)
+  Else
+  WshShell.Run ChemFichierTemp
+End If
+Set WshShell = Nothing
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub RecupeVBScript()
+Const ForReading = 1
+Set Fso = CreateObject("Scripting.FileSystemObject")
+Set F = Fso.OpenTextFile(ChemFichierTemp, ForReading)
+ContenuLgn = Split(F.ReadAll, vbNewLine)
+F.Close: Set F = Nothing: Set Fso = Nothing
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub NewPage(Ndeb, Nfin)
+Const adUseClient = 3
+Const adModeReadWrite = 3
+Const AdBookmarkFirst = 1
+Const adLockPessimistic = 2
+Const adOpenStatic = 3
+Dim Cnx, Rst, SQLConnect, SQLTbl
+Dim NomDeLaBDs, NomDeLaTable
+Dim NBrEnrg, NbrPage, NumPage, AffNbrLgn
+Dim T, U, V
+'<---------- Debut des lignes generées par la sub CreatTblMultiple de OutilBDsAccess.HTA
+ChemFichierTemp = "H:\Essais HTAs\Constructeur de requetes\GenTbl.hta"
+NomDeLaBDs = "LocalProd.mdb": NomDeLaTable = "TarifProduit"
+SQLConnect = "PROVIDER=Microsoft.Jet.OLEDB.4.0;Data Source=C:\PersoFrancis\Calculateurs\Calcul OptimDecoupe\BaseMdb\LocalProd.mdb;User Id=admin;Password=;"
+SQLTbl = "Select * From TarifProduit;"
+AffNbrLgn = 0
+' Fin lignes generé par la sub CreatTblMultiple de OutilBDsAccess.HTA ----------->
+'**********************************************************************************************************************
+RecupeVBScript
+For T = 0 To 145: MsGPage = MsGPage & ContenuLgn(T) & vbCrLf: Next
+Set Cnx = CreateObject("ADODB.Connection"): Cnx.CursorLocation = adUseClient: Cnx.Mode = adModeReadWrite: Cnx.Open SQLConnect
+Set Rst = CreateObject("ADODB.Recordset"): Rst.Open SQLTbl, Cnx, adOpenStatic, adLockPessimistic
+NBrEnrg = Rst.RecordCount
+If Nfin = NBrEnrg Then U = Nfin Else U = Nfin + 1
+'-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*- partie <body> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+'--------- Infos nom de la BDs, nom de la table, N° enregistrement debut et fin pour la page à afficher -----------
+MsGPage = MsGPage & Left(ContenuLgn(T), (InStr(1, ContenuLgn(T), ">", vbTextCompare))) & Ndeb + 1 & Right(ContenuLgn(T), 5) & vbCrLf
+MsGPage = MsGPage & Left(ContenuLgn(T + 1), (InStr(1, ContenuLgn(T + 1), ">", vbTextCompare))) & U & Right(ContenuLgn(T + 1), 5) & vbCrLf
+MsGPage = MsGPage & Left(ContenuLgn(T + 2), (InStr(1, ContenuLgn(T + 2), ">", vbTextCompare))) & NBrEnrg & Right(ContenuLgn(T + 2), 10) & vbCrLf
+U = T + 3: V = U + 2: For T = U To V: MsGPage = MsGPage & ContenuLgn(T) & vbCrLf: Next
+MsGPage = MsGPage & ContenuLgn(T)
+'---------- ajout de chaque lignes et valeur de chaque enregistrements -----------
+Rst.Move Ndeb, AdBookmarkFirst
+U = Nfin - Ndeb
+For V = 0 To U
+        If Not Rst.EOF Then
+            MsGPage = MsGPage & vbCrLf & "    <tr>" & vbCrLf & "        <td style=" & Chr(34) & "background-color:#E0E0E0;color:green" & Chr(34) & ">&nbsp" & Ndeb + V + 1 & "&nbsp</td>"
+            For T = 0 To Rst.Fields.Count - 1
+				If Rst.Fields(T).Type = 205 then
+					On Error Resume Next: MsGPage = MsGPage & "<td>" & Cstr(Rst.Fields(T).GetChunk(1024)) & "</td>": If Err.Number <> 0 Then Err.Clear: MsGPage = MsGPage & "<td>?Err?</td>"
+					Else
+					On Error Resume Next: MsGPage = MsGPage & "<td>" & Rst.Fields(T) & "</td>": If Err.Number <> 0 Then Err.Clear: MsGPage = MsGPage & "<td>?Err?</td>"
+				End If
+            Next
+            MsGPage = MsGPage & vbCrLf & "    </tr>"
+        End If
+        If Rst.EOF Then Exit For Else Rst.MoveNext
+Next
+Rst.Close
+Set Rst = Nothing
+Cnx.Close
+Set Cnx = Nothing
+'--- Liens pour appel des pages suivantes ---
+NumPage = Int((Ndeb + 1) / AffNbrLgn) + 1
+NbrPage = Int((NBrEnrg - 1) / AffNbrLgn): T = (NBrEnrg - 1) / AffNbrLgn
+If T > NbrPage Then NbrPage = NbrPage + 1
+MsGPage = MsGPage & vbCrLf & "  <tr style=" & Chr(34) & "background-color:#E0E0E0" & Chr(34) & ">" & vbCrLf
+MsGPage = MsGPage & "       <td colspan=" & Chr(34) & NbrPage & Chr(34) & ">"
+For V = 1 To NbrPage
+    If V = NumPage Then
+        MsGPage = MsGPage & vbCrLf & "         <span style=" & Chr(34) & "color:#788C8C" & Chr(34) & ">" & V & "</span>"
+        Else
+		If V <> NbrPage Then
+            MsGPage = MsGPage & vbCrLf & "         <a id=" & Chr(34) & "Lien" & V & Chr(34) & " style=" & Chr(34) & "color:blue;text-Decoration:underline" & Chr(34) _
+            & " Title=" & Chr(34) & "Enregistrements: " & (((V - 1) * AffNbrLgn) + 1) & "/" & (V * AffNbrLgn) & Chr(34) _
+            & " onClick=" & Chr(34) & "NewPage " & ((V - 1) * AffNbrLgn) & "," & ((V * AffNbrLgn) - 1) & Chr(34) _
+            & " onmouseover=" & Chr(34) & "MouseEnter(Lien" & V & ")" & Chr(34) _
+            & " onmouseout=" & Chr(34) & "MouseExit(Lien" & V & ")" & Chr(34) _
+            & ">" & V & "</a>"
+            Else
+            T = NBrEnrg
+            MsGPage = MsGPage & vbCrLf & "         <a id=" & Chr(34) & "Lien" & V & Chr(34) & " style=" & Chr(34) & "color:blue;text-Decoration:underline" & Chr(34) _
+            & " Title=" & Chr(34) & "Enregistrements: " & (((V - 1) * AffNbrLgn) + 1) & "/" & T & Chr(34) _
+            & " onClick=" & Chr(34) & "NewPage " & ((V - 1) * AffNbrLgn) & "," & T & Chr(34) _
+            & " onmouseover=" & Chr(34) & "MouseEnter(Lien" & V & ")" & Chr(34) _
+            & " onmouseout=" & Chr(34) & "MouseExit(Lien" & V & ")" & Chr(34) _
+            & ">" & V & "</a>"
+        End If
+    End If
+Next
+V = UBound(ContenuLgn) - 4
+For T = V To UBound(ContenuLgn)
+         MsGPage = MsGPage & vbCrLf & ContenuLgn(T)
+Next
+'-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*- fin partie <body> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+EnregJouerTbl
+If chkClose.Checked Then window.Close()
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+</SCRIPT>
+'----------------------------------------------------------------------------------------------------------------------
+<body>
+<H5>Conserne la BDS: <em style="color: blue">NomBDs</em>
+&nbsp&nbsp&nbsp&nbspTable: <em style="color: blue">NomTable</em>
+&nbsp&nbsp&nbsp&nbspRequête: <em style="color: blue">LaRequete</em><br>
+Enregistrements N° <em style="color: blue">N°Deb</em>
+ à <em style="color: blue">N°Fin</em>
+ sur <em style="color: red">NbrTotal</em></H5>
+<table cellspacing="0" rules="all" border="1" style="border-collapse:collapse;">
+    <tr style="background-color:#E0E0E0">
+    </tr>
+  <tr style="background-color:#E0E0E0">
+  </tr>
+</table>
+	<INPUT Type="checkbox" name="chkClose" CHECKED><em style="color: green">Fermer cette page après mon nouveau choix</em>
+</body>

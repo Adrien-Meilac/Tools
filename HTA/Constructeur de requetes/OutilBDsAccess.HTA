@@ -1,0 +1,833 @@
+<HEAD lang="fr">
+<!-- <meta http-equiv="Content-Type" content="text/html;charset=iso-8859-15" /> -->
+<meta http-equiv="Content-Type" content="text/html;charset=iso-8859-15" />
+  <title> Mes premiers pas pour un HTML Application </title>
+	<HTA:APPLICATION
+		id="OutilBDsAccess"
+		applicationname="OutilBDsAccess"
+		version="1"
+		ICON="DBSHTA.ico"
+	>
+	<SCRIPT language="VBScript" type="text/vbscript">ResizeTo 835,580: MoveTo (Screen.Width-835)/2,(Screen.Height - 685) / 2</SCRIPT>
+</HEAD>
+
+<SCRIPT language="VBScript" type="text/vbscript">
+' Déclarations utilisables dans toute la partie VBScript 
+    Const ForWriting = 2
+    Const AdBookmarkFirst = 1
+    Const adLockPessimistic = 2
+    Const adOpenStatic = 3
+    Const adUseClient = 3
+    Const adModeReadWrite = 3
+    Const adStateClosed = 0     'Indique que l'objet Recordset est fermé.
+    Const adStateOpen = 1       'Indique que l'objet est ouvert.
+    Const adStateConnecting = 2 'l'objet Recordset est en train de se connecter.
+    Const adStateExecuting = 4  'l'objet Recordset est en train d'exécuter une commande.
+    Const adStateFetching = 8   'les lignes de l'objet Recordset sont en cours d'extraction.
+
+    Dim Cnx, Rst
+    Dim NomDeLaBDs, NomDeLaTable
+    Dim TypeBD
+    Dim CheminNomDelabase
+    Dim ChemNomBDsDSN()
+    Dim DossierDuProg, ChemFichierTemp, ChemFichierModel
+    Dim SQL, SQLConnect, SQLTbl
+    Dim MsG, Memo
+    Dim T, U, V, NbrLgn, Deb, Fin
+    Dim oOption
+    Dim WshShell, Fso, F
+    Dim ContenuLgn, MsGPage
+'----------------------------------------------------------------------------------------------------------------------
+Sub Window_Onload()
+    Set WshShell = CreateObject("WScript.Shell")
+    DossierDuProg = WshShell.CurrentDirectory & "\"
+    Set WshShell = Nothing
+    NbrTbl.Value = "0": NbrChamps.Value = "0"
+    RecupDSNs
+End Sub
+'----------------------------- Recuperation des noms de source utilisateur (DSN)---------------------------------------
+Sub RecupDSNs()
+    Dim oReg, Rep
+    Dim ClefPrimaire, ClefSecondaire, ClefDSN
+    Dim TblClefDSN, DSN, StrDriver
+    Dim TblClefPro, Pro, StrChemNom
+    Const HKEY_CURRENT_USER = &H80000001
+    U = 0
+    Set oReg = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default:StdRegProv")
+
+    ClefPrimaire = "Software\ODBC\ODBC.INI"
+    ClefSecondaire = ClefPrimaire & "\ODBC Data Sources"
+    oReg.EnumValues HKEY_CURRENT_USER, ClefSecondaire, TblClefDSN, Rep
+' ******* dans un premier temps, je me limite aux bases de données Access (mdb) (accdb)**********
+    For V = LBound(TblClefDSN) To UBound(TblClefDSN)
+        DSN = TblClefDSN(V)
+        'msgbox "DSN = " & DSN 'Noms des clefs DSN = nom de la source utilisateur
+        oReg.GetStringValue HKEY_CURRENT_USER, ClefSecondaire, DSN, StrDriver
+        'msgbox "DriverBd = " & StrDriver 'Nom du driver pour cette clef ex: Microsoft Access Driver (*.mdb)
+        If InStr(1, LCase(StrDriver), "*.mdb", vbTextCompare) <> 0 Or InStr(1, UCase(StrDriver), "*.accdb", vbTextCompare) <> 0 Then
+            'msgbox "DriverBd = " & StrDriver 'Nom du driver pour cette clef ex: Microsoft Access Driver (*.mdb)
+            ClefDSN = ClefPrimaire & "\" & DSN
+            'msgbox ClefDSN 'Software\ODBC\ODBC.INI\BDpourEssaisPerso
+            oReg.EnumValues HKEY_CURRENT_USER, ClefDSN, TblClefPro, Rep
+            For T = LBound(TblClefPro) To UBound(TblClefPro)
+                Pro = TblClefPro(T) 'nom de la clef
+                oReg.GetStringValue HKEY_CURRENT_USER, ClefDSN, Pro, StrChemNom
+                'If InStr(1, UCase(StrChemNom), ".mdb", vbTextCompare) <> 0 Then
+                If InStr(1, LCase(StrChemNom), ".mdb", vbTextCompare) <> 0 Or InStr(1, LCase(StrChemNom), ".accdb", vbTextCompare) <> 0 Then
+                    'msgbox StrChemNom 'chemin complet et nom de la BDs
+                    U = U + 1
+                    ReDim Preserve ChemNomBDsDSN(U)
+                    ChemNomBDsDSN(U - 1) = StrChemNom
+                    Set oOption = window.Document.createElement("OPTION")
+                    oOption.Text = DSN
+                    oOption.Value = "Option " & U - 1
+                    LstDsn.Add (oOption)
+                End If
+            Next
+        End If
+    Next
+ If U >= 1 Then chkBDsDSN.disabled = ""
+ End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub ChoixFichier()
+    If NameBDs.Value <> "" Then
+        CheminNomDelabase = NameBDs.Value
+        TypeBD = UCase(Right(CheminNomDelabase, InStr(1, StrReverse(CheminNomDelabase), ".", vbTextCompare) - 1))
+		chkBDsFichier.disabled = ""
+        If chkBDsFichier.Checked Then
+			If TypeBD = "MDB" Or TypeBD = "ACCDB" then
+				txtRqtConnx.Value = "PROVIDER=Microsoft.ACE.OLEDB.12.0;Data Source=" & NameBDs.Value & ";User Id=admin;Password=;"
+				Else
+				txtRqtConnx.Value = "PROVIDER=Microsoft.Jet.OLEDB.4.0;Data Source=" & NameBDs.Value & ";User Id=admin;Password=;"
+			End If
+			Else
+			CheminNomDelabase = ""
+		End If
+	End If
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub tstBouton1()
+    If txtRqtConnx.Value = "" Then
+        If chkBDsFichier.Checked Then
+            If NameBDs.Value <> "" Then
+				TypeBD = UCase(Right(NameBDs, InStr(1, StrReverse(NameBDs), ".", vbTextCompare) - 1))
+				If TypeBD = "MDB" Or TypeBD = "ACCDB" then
+					txtRqtConnx.Value = "PROVIDER=Microsoft.ACE.OLEDB.12.0;Data Source=" & NameBDs.Value & ";User Id=admin;Password=;"
+					Else
+					txtRqtConnx.Value = "PROVIDER=Microsoft.Jet.OLEDB.4.0;Data Source=" & NameBDs.Value & ";User Id=admin;Password=;"
+				End If
+			End If
+        End If
+    End If
+    
+    If txtRqtConnx.Value = "" Then
+        MsgBox "Le test de connexion ne peut être fait." & vbCrLf & "la boite de requête BDs est vide", vbCritical, "Erreur"
+        Else
+        SQL = txtRqtConnx.Value
+        ConnBds
+        If Cnx.state = adStateOpen Then
+            AjoutLstTable
+            Cnx.Close: Set Cnx = Nothing
+            MsG = "Test Ok"
+            MsgBox MsG, vbInformation, "Connexion BDs"
+        End If
+    End If
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub VerifCnt()
+    Deb = InStr(1, txtRqtConnx.Value, "Data Source=", vbTextCompare)
+    If Deb <> 0 Then
+        Deb = Deb + Len("Data Source=")
+        Fin = InStr(Deb, txtRqtConnx.Value, ";", vbTextCompare)
+        If Fin <> 0 Then CheminNomDelabase = Mid(txtRqtConnx.Value, Deb, Fin - Deb)
+    End If
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub ConnBds()
+    BtTester2.disabled = "disabled": BtTester3.disabled = "disabled": BtTester4.disabled = "disabled"
+    Set Cnx = Nothing
+    Set Cnx = CreateObject("ADODB.Connection")
+    Cnx.CursorLocation = adUseClient: Cnx.Mode = adModeReadWrite
+    On Error Resume Next
+    Cnx.Open SQL
+    If Err.Number <> 0 Then
+        MsG = "Erreur N°" & Err.Number & vbCrLf _
+        & "Description:" & vbCrLf & Err.Description & vbCrLf _
+        & "Impossible d'ouvrire la BDs "
+        MsgBox MsG, vbCritical, "Erreur connexion BDs"
+        Else
+        BtTester2.disabled = "": BtTester3.disabled = "": BtTester4.disabled = ""
+    End If
+    NomDeLaBDs = ExtratFichier(CheminNomDelabase)
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub AjoutLstTable()
+    Dim Schema, NomTable
+    Const adSchemaColumns = 4
+    'vide la liste tables
+    For V = LstTbl.length To 0 Step -1: LstTbl.Remove (V): Next
+    'connexion pour récupération des noms de tables
+    Set Schema = Cnx.OpenSchema(adSchemaColumns)
+    If Not Schema.EOF Then V = 1 Else V = 0
+    U = 0
+    While Not Schema.EOF
+        If Schema.Fields("Table_NAME") <> "" And NomTable <> Schema.Fields("Table_NAME") Then
+            NomTable = Schema.Fields("Table_NAME"): U = U + 1
+            'ajoute les noms de tables
+            Set oOption = window.Document.createElement("OPTION")
+            oOption.Text = NomTable
+            oOption.Value = NomTable
+            LstTbl.Add (oOption)
+        End If
+        Schema.MoveNext
+    Wend
+    Schema.Close
+    NbrTbl.Value = U
+    If V = 0 Then
+        NomDeLaTable = "Auncune table disponnible"
+        Set oOption = window.Document.createElement("OPTION")
+        oOption.Text = NomDeLaTable
+        oOption.Value = "Option " & V
+        LstTbl.Add (oOption)
+        chkTbl.Checked = "": chkTbl.disabled = "disabled": LstTbl.disabled = "disabled"
+        Else
+        chkTbl.disabled = ""
+        If chkTbl.Checked Then LstTbl.disabled = ""
+        NomDeLaTable = LstTbl.Value
+        RecupNomChamps
+    End If
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub RecupNomChamps()
+    'vide le listage champs de la table
+    txtLstChamps.Value = "": Memo = "": SQL = txtRqtConnx.Value
+    ConnBds
+    SQL = "Select * From " & NomDeLaTable
+    OuvreTbl
+    U = 0
+    If Rst.state = adStateOpen Then
+        U = Rst.Fields.Count
+        For V = 1 To Rst.Fields.Count
+            If V > 1 Then Memo = Memo & vbCrLf
+            Memo = Memo & Rst.Fields(V - 1).Name
+        Next
+        Rst.Close: Set Rst = Nothing
+        txtLstChamps.Value = Memo
+    End If
+    NbrChamps.Value = U
+End Sub
+'------------------------------------------------ conserne txtLstChamps ----------------------------------------------------
+Sub MouseEnter(Lobjet)
+    Memo = Lobjet.Value
+    Lobjet.Style.Height = 38
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub MouseExit(Lobjet)
+Lobjet.Value = Memo
+  Lobjet.Style.Height = 22
+End Sub
+'--------------------------------------------Fin  conserne txtLstChamps ------------------------------------------------
+Sub tstBouton2()
+    If txtRqtConnx.Value = "" Then
+        MsgBox "La connexion ne peut être fait." & vbCrLf & "la boite de requête BDs est vide", vbCritical, "Erreur"
+        Else
+        If txtOuvrTbl.Value = "" Then
+            MsgBox "Le test d'ouverture de table ne peut être fait." & vbCrLf & "la boite de requête TABLE est vide", vbCritical, "Erreur"
+            Else
+            SQL = txtRqtConnx.Value
+            ConnBds
+            If Cnx.state = adStateOpen Then
+                SQL = txtOuvrTbl.Value
+                OuvreTbl
+                If Rst.state = adStateOpen Then
+                    If SQL <> txtOuvrTbl.Value Then txtOuvrTbl.Title = "OldRequête:" & txtOuvrTbl.Value: txtOuvrTbl.Value = SQL Else txtOuvrTbl.Title = ""
+                    If Rst.EOF Then
+                        MsG = "Aucun enregistrement disponnible" & vbCrLf
+                        Else
+                        MsG = "Nbr. d'enregistrements: " & Rst.RecordCount & vbCrLf
+                        If InStr(1, UCase(SQL), "COUNT(") <> 0 Then MsG = "Count = " & Rst.Fields(0).Value & vbCrLf
+                        If InStr(1, UCase(SQL), "SUM(") <> 0 Then MsG = "Sum = " & Rst.Fields(0).Value & vbCrLf
+                        If InStr(1, UCase(SQL), "MAX(") <> 0 Then MsG = "Max = " & Rst.Fields(0).Value & vbCrLf
+                        If InStr(1, UCase(SQL), "MIN(") <> 0 Then MsG = "Min = " & Rst.Fields(0).Value & vbCrLf
+                        If InStr(1, UCase(SQL), "AVG(") <> 0 Then MsG = "Avg = " & Rst.Fields(0).Value & vbCrLf
+                    End If
+                    Rst.Close: Set Rst = Nothing
+                    Cnx.Close: Set Cnx = Nothing
+                    MsG = MsG & "Test Ok"
+                    MsgBox MsG, vbInformation, "Ouverture Table"
+                End If
+            End If
+        End If
+    End If
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub tstBouton3()
+    If txtRqtConnx.Value = "" Then
+        MsgBox "La connexion ne peut être fait." & vbCrLf & "la boite de requête BDs est vide", vbCritical, "Erreur"
+        Else
+        If txtOuvrTbl.Value = "" Then
+            MsgBox "Le test d'ouverture de table ne peut être fait." & vbCrLf & "la boite de requête TABLE est vide", vbCritical, "Erreur"
+            Else
+            SQL = txtRqtConnx.Value
+            ConnBds
+            If Cnx.state = adStateOpen Then
+                SQL = txtOuvrTbl.Value
+                OuvreTbl
+                If Rst.state = adStateOpen Then
+                    If Rst.EOF Then
+                        MsG = "Test Ok, mais aucun enregistrement disponnible" & vbCrLf
+                        MsgBox MsG, vbInformation, "Ouverture Table"
+                        Exit Sub
+                    End If
+                    CreatTbl
+                    Rst.Close: Set Rst = Nothing
+                    Cnx.Close: Set Cnx = Nothing
+                End If
+            End If
+        End If
+    End If
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub CreatTbl()
+    MsGPage = "<HEAD lang=" & Chr(34) & "fr" & Chr(34) & "> " & vbCrLf _
+        & "<title>Visu resultat de la requête</title>" & vbCrLf _
+        & "  <HTA:APPLICATION" & vbCrLf _
+        & "      id =" & Chr(34) & "GenTblSpl" & Chr(34) & vbCrLf _
+        & "      applicationname =" & Chr(34) & "GenTblSpl" & Chr(34) & vbCrLf _
+        & "      ICON=" & Chr(34) & "TBLHTA.ico" & Chr(34) & vbCrLf _
+        & "      version =" & Chr(34) & "1" & Chr(34) & vbCrLf _
+        & "  >" & vbCrLf _
+        & "</HEAD>" & vbCrLf _
+        & "<body>" & vbCrLf _
+        & "<H5>Conserne la BDS: <em style=" & Chr(34) & "color: blue;" & Chr(34) & ">" & NomDeLaBDs & "</em><br>" & vbCrLf _
+        & "Table: <em style=" & Chr(34) & "color: blue;" & Chr(34) & ">" & NomDeLaTable & "</em><br>" & vbCrLf _
+        & "Requête: <em style=" & Chr(34) & "color: blue;" & Chr(34) & ">" & txtOuvrTbl.Value & "</em><br>" & vbCrLf _
+        & "Nombre d'enregistrements: <em style=" & Chr(34) & "color: red;" & Chr(34) & ">" & Rst.RecordCount & "</em></H5>" & vbCrLf _
+        & "<table cellspacing=" & Chr(34) & "0" & Chr(34) & " rules=" & Chr(34) & "all" & Chr(34) & " border=" & Chr(34) & "1" & Chr(34) & " style=" & Chr(34) & "border-collapse:collapse;" & Chr(34) & ">" & vbCrLf _
+        & "    <tr style=" & Chr(34) & "background-color:#E0E0E0;" & Chr(34) & ">" & vbCrLf
+    'titrage colonnes avec les noms de champs
+    MsGPage = MsGPage & "        <td>&nbsp&nbsp</td>"
+    MsG = "?"
+    If InStr(1, UCase(txtOuvrTbl.Value), "SUM(") <> 0 Then
+        MsG = Mid(txtOuvrTbl.Value, InStr(1, UCase(txtOuvrTbl.Value), "SUM("), InStr(1, UCase(txtOuvrTbl.Value), ")") - InStr(1, UCase(txtOuvrTbl.Value), "SUM("))
+    End If
+    If InStr(1, UCase(txtOuvrTbl.Value), "COUNT(") <> 0 Then
+        MsG = Mid(txtOuvrTbl.Value, InStr(1, UCase(txtOuvrTbl.Value), "COUNT("), InStr(1, UCase(txtOuvrTbl.Value), ")") - InStr(1, UCase(txtOuvrTbl.Value), "COUNT("))
+    End If
+    If InStr(1, UCase(txtOuvrTbl.Value), "MAX(") <> 0 Then
+        MsG = Mid(txtOuvrTbl.Value, InStr(1, UCase(txtOuvrTbl.Value), "MAX("), InStr(1, UCase(txtOuvrTbl.Value), ")") - InStr(1, UCase(txtOuvrTbl.Value), "MAX("))
+    End If
+    If InStr(1, UCase(txtOuvrTbl.Value), "MIN(") <> 0 Then
+        MsG = Mid(txtOuvrTbl.Value, InStr(1, UCase(txtOuvrTbl.Value), "MIN("), InStr(1, UCase(txtOuvrTbl.Value), ")") - InStr(1, UCase(txtOuvrTbl.Value), "MIN("))
+    End If
+    If InStr(1, UCase(txtOuvrTbl.Value), "AVG(") <> 0 Then
+        MsG = Mid(txtOuvrTbl.Value, InStr(1, UCase(txtOuvrTbl.Value), "AVG("), InStr(1, UCase(txtOuvrTbl.Value), ")") - InStr(1, UCase(txtOuvrTbl.Value), "AVG("))
+    End If
+    If MsG = "?" Then
+        For V = 0 To Rst.Fields.Count - 1: MsGPage = MsGPage & "<td>&nbsp" & Rst.Fields(V).Name & "&nbsp</td>": Next
+        Else
+        MsGPage = MsGPage & "<td>&nbsp" & MsG & ")&nbsp</td>"
+    End If
+    MsGPage = MsGPage & vbCrLf & "    </tr>"
+    'ajout de chaque lignes et valeur de chaque enregistrements
+    For V = 0 To Rst.RecordCount - 1
+        MsGPage = MsGPage & vbCrLf & "    <tr>" & vbCrLf & "        <td style=" & Chr(34) & "background-color:#E0E0E0;color:green" & Chr(34) & ">&nbsp" & V + 1 & "&nbsp</td>"
+        For T = 0 To Rst.Fields.Count - 1
+            'Rst.Fields(T) plante le programme pour les tables "MSysAccessObjects", provisoire  ********* a solutionner ************
+            'MsgBox Rst.Fields(T).Type
+			If Rst.Fields(T).Type = 205 Or Rst.Fields(T).Type = 204 then 'adLongVarBinary exemple 10101010, pour 204 adVarBinary >>> erreur
+				If Rst.Fields(T).Type = 205 then
+					On Error Resume Next: MsGPage = MsGPage & "<td>" & Cstr(Rst.Fields(T).GetChunk(1024)) & "</td>"
+					If Err.Number <> 0 Then Err.Clear: MsGPage = MsGPage & "<td>?Err?</td>"
+					Else
+					'MsG = Rst.Fields(T): MsgBox MsG'  204 adVarBinary
+					On Error Resume Next: MsGPage = MsGPage & "<td>" & "???" & "</td>"
+					If Err.Number <> 0 Then Err.Clear: MsGPage = MsGPage & "<td>?Err?</td>"
+				End If
+				Else
+				On Error Resume Next: MsGPage = MsGPage & "<td>" & Rst.Fields(T) & "</td>": If Err.Number <> 0 Then Err.Clear: MsGPage = MsGPage & "<td>?Err?</td>"
+			End If
+        Next
+        MsGPage = MsGPage & vbCrLf & "    </tr>"
+        If V <> Rst.RecordCount - 1 Then Rst.MoveNext
+    Next
+    MsGPage = MsGPage & vbCrLf & "</table>" & vbCrLf & "</body>"
+    EnregJouerTbl ExtratChem(DossierDuProg) & "\GenTblSpl.hta"
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub EnregJouerTbl(ChemNomFich)
+'cette Sub est utlisée par le bouton "Test+" et "Test++" aprés construction du tableau
+    'enregistre le fichier "GenTblSpl.hta" ou "GenTblMlt.hta"
+    Set Fso = CreateObject("Scripting.FileSystemObject")
+    Set F = Fso.OpenTextFile(ChemNomFich, ForWriting, True)
+    F.Write MsGPage
+    F.Close: Set F = Nothing: Set Fso = Nothing
+    'lance le fichier "GenTblSpl.hta" ou "GenTblMlt.hta"
+    Set WshShell = CreateObject("WScript.Shell")
+    If InStr(1, ChemNomFich, " ") Then
+        WshShell.Run Chr(34) & ChemNomFich & Chr(34)
+        Else
+        WshShell.Run ChemNomFich
+    End If
+    Set WshShell = Nothing
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub OuvreTbl()
+    Set Rst = Nothing
+    Set Rst = CreateObject("ADODB.Recordset")
+    On Error Resume Next
+	'***************** New du 26/10/2013 *****************
+	If InStr(1, UCase(SQL), "EXCLURE", vbTextCompare) Then
+		SQL = FormatRqtSql(SQL)
+	End If
+	'***************** fin New du 26/10/2013 *****************
+    
+	If chkTbl.Checked Then SQL = VerifReqt(SQL)
+   
+    Rst.Open SQL, Cnx, adOpenStatic, adLockPessimistic
+    If Err.Number <> 0 Then
+        MsG = "Erreur N°" & Err.Number & vbCrLf _
+        & "Description:" & vbCrLf & Err.Description & vbCrLf _
+        & "Impossible d'ouvrire la table" & vbCrLf _
+        & "SQL = " & SQL
+        MsgBox MsG, vbCritical, "Erreur ouverture table"
+        Exit Sub
+    End If
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+	'***************** New du 26/10/2013 *****************
+Function FormatRqtSql(Reqt)
+	Dim LeftSql, RightSql, ExcludeChamp, ListeChamps
+	Dim LaReqtSQL
+	If TableNom(Reqt) <> NomDeLaTable Then
+		NomDeLaTable = TableNom(Reqt)
+		Dim RstTemp 
+		Set RstTemp = CreateObject("ADODB.Recordset")
+		RstTemp.Open "Select * From " & NomDeLaTable, Cnx, adOpenStatic, adLockPessimistic
+		If RstTemp.state = adStateOpen Then
+			Memo = ""
+			For V = 1 To RstTemp.Fields.Count
+				If V > 1 Then Memo = Memo & vbCrLf
+				Memo = Memo & RstTemp.Fields(V - 1).Name
+			Next
+			RstTemp.Close: Set RstTemp = Nothing
+		End If
+		Else
+	End If
+	ListeChamps = Split(Memo, vbNewLine)
+
+	LaReqtSQL = Reqt
+
+	LeftSql = Trim(Left(LaReqtSQL, (InStr(1, UCase(LaReqtSQL), " FROM", vbTextCompare))))
+	RightSql = Right(LeftSql, Len(LeftSql) - (InStr(1, UCase(LaReqtSQL), "EXCLURE", vbTextCompare) + 7))
+	ExcludeChamp = Split(RightSql, ",")
+	RightSql = Trim(Right(LaReqtSQL, Len(LaReqtSQL) - (InStr(1, UCase(LaReqtSQL), " FROM", vbTextCompare) - 1)))
+	LeftSql = Trim(Left(LaReqtSQL, ((InStr(1, UCase(LaReqtSQL), "EXCLURE", vbTextCompare)) - 3)))
+	LeftSql = Replace(LeftSql, " *,", "")
+	If Len(LeftSql) < 9 Then LeftSql = Replace(LeftSql, "*", "")
+
+	For T = 0 To UBound(ListeChamps)
+		If InStr(1, LeftSql, ListeChamps(T), vbTextCompare) = 0 Then
+			If Len(LeftSql) = 7 Then
+				LeftSql = LeftSql & Trim(ListeChamps(T))
+				Else
+				LeftSql = LeftSql & ", " & Trim(ListeChamps(T))
+			End If
+		End If
+	Next
+
+	For T = 0 To UBound(ExcludeChamp)
+		ExcludeChamp(T) = Trim(ExcludeChamp(T))
+		LeftSql = Replace(LeftSql, ", " & ExcludeChamp(T), "")
+	Next
+	LaReqtSQL = LeftSql & " " & RightSql
+	FormatRqtSql = LaReqtSQL
+End Function
+'----------------------------------------------------------------------------------------------------------------------
+Function TableNom(Reqt)
+	Deb = InStr(1, UCase(Reqt), " FROM ", vbTextCompare) + 7
+	Fin = InStr(Deb, Reqt, " ", vbTextCompare)
+	If Fin = 0 Then Fin = Len(Reqt) + 1
+	TableNom = Mid(Reqt, Deb - 1, (Fin - Deb) + 1)
+End Function
+	'***************** fin New du 26/10/2013 *****************
+'----------------------------------------------------------------------------------------------------------------------
+Sub TestChekDSN()
+    MiseAblanc
+    If chkBDsDSN.Checked Then
+        For V = 0 To LstDsn.length - 1
+            If LstDsn(V).Selected Then CheminNomDelabase = ChemNomBDsDSN(V): Exit For
+        Next
+        chkBDsFichier.Checked = "": LstDsn.disabled = ""
+        TypeBD = UCase(Right(CheminNomDelabase, InStr(1, StrReverse(CheminNomDelabase), ".", vbTextCompare) - 1))
+		If TypeBD = "MDB" Or TypeBD = "ACCDB" then
+			txtRqtConnx.Value = "PROVIDER=Microsoft.ACE.OLEDB.12.0;Data Source=" & CheminNomDelabase & ";User Id=admin;Password=;"
+			Else
+			txtRqtConnx.Value = "PROVIDER=Microsoft.Jet.OLEDB.4.0;Data Source=" & CheminNomDelabase & ";User Id=admin;Password=;"
+		End If
+        Else
+        LstDsn.disabled = "disabled": txtRqtConnx.Value = ""
+    End If
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub MiseAblanc()
+    txtOuvrTbl.Value = "": txtOuvrTbl.Title = ""
+    NbrTbl.Value = "0": NbrChamps.Value = "0"
+    For V = LstTbl.length To 0 Step -1: LstTbl.Remove (V): Next 'vide la liste tables
+    LstTbl.disabled = "disabled"
+    chkTbl.Checked = "": chkTbl.disabled = "disabled"
+    txtLstChamps.Value = "": txtLstChamps.disabled = "disabled"
+    BtTester2.disabled = "disabled": BtTester3.disabled = "disabled": BtTester4.disabled = "disabled"
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub TestChekFichier()
+    MiseAblanc
+    If chkBDsFichier.Checked Then
+        chkBDsDSN.Checked = ""
+        If NameBDs.Value = "" Then
+            MsgBox "Choisissez une BDs avec le bouton Parcourir ..", vbInformation, "BDs"
+            Else
+            If NameBDs.Value <> "" Then
+				TypeBD = UCase(Right(NameBDs.Value, InStr(1, StrReverse(NameBDs.Value), ".", vbTextCompare) - 1))
+				If TypeBD = "MDB" Or TypeBD = "ACCDB" then
+					txtRqtConnx.Value = "PROVIDER=Microsoft.ACE.OLEDB.12.0;Data Source=" & NameBDs.Value & ";User Id=admin;Password=;"
+					Else
+					txtRqtConnx.Value = "PROVIDER=Microsoft.Jet.OLEDB.4.0;Data Source=" & NameBDs.Value & ";User Id=admin;Password=;"
+				End If
+			End If
+        End If
+        Else
+        txtRqtConnx.Value = ""
+    End If
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub TestChekTbl()
+    If chkTbl.Checked Then
+        If NomDeLaTable <> LstTbl.Value Or txtOuvrTbl.Value = "" Then
+			NomDeLaTable = LstTbl.Value: txtOuvrTbl.Value = "Select * From " & NomDeLaTable: txtOuvrTbl.Title = ""
+		End If
+		LstTbl.disabled = "": txtLstChamps.disabled = ""
+        RecupNomChamps
+        Else
+        LstTbl.disabled = "disabled": txtLstChamps.disabled = "disabled"
+        NomDeLaTable = ""
+    End If
+End Sub
+'+++++++++++++++++++++++++++++++++++++++++++++++ Partie formatage de la rêquete +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Function VerifReqt(Req)
+'pour mettre entre [ et ] un nom de colonne ou un nom de table contenant un caractére engendrant une erreur, ICI le / et ~ et ' (a complèté peut être)
+Dim Deb, Pos, Cpt
+Dim NotCara(2)
+Dim MsgTemp
+
+NotCara(0) = "/": NotCara(1) = "~": NotCara(2) = "'"
+If Right(Req, 1) = ";" Then Req = Left(Req, Len(Req) - 1)
+VerifReqt = Req
+For Cpt = 0 To UBound(NotCara)
+    Pos = 1: MsgTemp = ""
+    If InStr(Pos, Req, NotCara(Cpt)) <> 0 Then
+        Do
+            Deb = -1
+            Pos = InStr(Pos, Req, NotCara(Cpt))
+            Select Case Pos
+                
+                Case 0: Exit Do 'le caractère spécial n'est pas contenu dans la phrase
+            
+                Case 1 'Bon ****************
+                    'le caractère spécial débute le mot et ce mot débute la phrase
+                    Deb = 1: MsgTemp = RecupMotDebute(Req, Deb, Len(Req))
+                    Pos = Fin
+                Case Else
+                    If Pos > 1 then
+						If Mid(Req, Pos - 1, 1) = " " Then 'Bon ************
+							'le caractère spécial débute le mot mais pas la phrase
+							Deb = Pos: MsgTemp = RecupMotDebute(Req, Deb, Len(Req))
+							Pos = Fin
+							Else
+							If Pos = Len(Req) Then 'Bon **************
+								'le caractère spécial finit le mot et la phrase
+								Deb = 1: MsgTemp = RecupMotFinit(Req, Deb, Len(Req))
+								Pos = Fin
+								Else
+								If Mid(Req, Pos + 1, 1) = " " Or Mid(Req, Pos + 1, 1) = "," Then 'Bon **************
+									'le caractère spécial finit le mot mais pas la phrase
+									Deb = 1: MsgTemp = RecupMotFinit(Req, Deb, Pos)
+									Pos = Pos + 1
+									Else
+									'le caractère spécial est contenu dans le mot
+									MsgTemp = RecupleMot(Req, Pos)
+									If NotCara(Cpt) = "'" Then
+										If left(MsgTemp,1) = "=" Or left(MsgTemp,1) = "<" Or left(MsgTemp,1) = ">"  Or left(MsgTemp,1) = " " Then
+											Else
+											Req = Replace(Req, MsgTemp, Replace(MsgTemp, "'", "''"))
+										End If
+									End If
+									Pos = Fin
+								End If
+							End If
+						End If
+					End IF
+            End Select
+            If NotCara(Cpt) <> "'" Then
+                If Left(MsgTemp, 1) = "#" Or Right(MsgTemp, 1) = "#" Then
+                    'cas particulier des DATEs
+                    Else
+                    Req = Replace(Req, MsgTemp, "[" & MsgTemp & "]")
+                    Req = Replace(Req, "[[", "[")
+                    Req = Replace(Req, "]]", "]")
+                End If
+            End If
+        Loop
+    End If
+Next
+Req = Replace(Req, "[[", "[")
+Req = Replace(Req, "]]", "]")
+VerifReqt = Req
+End Function
+'----------------------------------------------------------------------------------------------------------------------
+Function RecupMotDebute(Reqt, Db, Fi)
+Dim Cpt0
+For Cpt0 = Db To Fi
+    If Mid(Reqt, Cpt0, 1) = " " Or Mid(Reqt, Cpt0, 1) = "," Then RecupMotDebute = Mid(Reqt, Db, Cpt0 - Db): Exit For
+Next
+If RecupMotDebute = "" Then RecupMotDebute = Mid(Reqt, Db, Len(Reqt) - (Db - 1))
+Fin = Db + Len(RecupMotDebute) + 1
+End Function
+'----------------------------------------------------------------------------------------------------------------------
+Function RecupMotFinit(Reqt, Db, Fi)
+Dim Cpt1
+For Cpt1 = Fi To Db Step -1
+    If Mid(Reqt, Cpt1, 1) = " " Or Mid(Reqt, Cpt1, 1) = "," Then RecupMotFinit = Mid(Reqt, Cpt1 + 1, Fi - Cpt1): Exit For
+Next
+If RecupMotFinit = "" Then RecupMotFinit = Mid(Reqt, Db, Fi - (Db - 1))
+Fin = Len(Reqt) + 1
+End Function
+'----------------------------------------------------------------------------------------------------------------------
+Function RecupleMot(Reqt, Posi)
+Dim Cpt2
+Dim MotGauche, MotDroite
+'<---< remonte la phrase
+For Cpt2 = Posi To 1 Step -1
+    If Mid(Reqt, Cpt2, 1) = " " Or Mid(Reqt, Cpt2, 1) = "," Then MotGauche = Mid(Reqt, Cpt2 + 1, Posi - Cpt2 - 1): Exit For
+Next
+If MotGauche = "" Then MotGauche = Mid(Reqt, 1, Posi - 1)
+'descend la phrase >--->
+For Cpt2 = Posi + 1 To Len(Reqt)
+    If Mid(Reqt, Cpt2, 1) = " " Or Mid(Reqt, Cpt2, 1) = "," Then MotDroite = Mid(Reqt, Posi + 1, Cpt2 - Posi - 1): Exit For
+Next
+If MotDroite = "" Then MotDroite = Mid(Reqt, Posi + 1, Len(Reqt) - Posi)
+RecupleMot = MotGauche & Mid(Reqt, Posi, 1) & MotDroite
+Fin = Posi + Len(MotDroite) + 1
+End Function
+'+++++++++++++++++++++++++++++++++++++++++++ Fin partie formatage de la rêquete +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+'----------------------------------------------------------------------------------------------------------------------
+Function ExtratFichier(ChemNom)
+    Dim StrData, Pos
+    StrData = StrReverse(ChemNom)
+    Pos = InStr(1, StrData, "\", vbTextCompare)
+    StrData = Left(StrData, Pos - 1)
+    StrData = StrReverse(StrData)
+    ExtratFichier = StrData
+End Function
+'----------------------------------------------------------------------------------------------------------------------
+Function ExtratChem(ChemNom)
+    ExtratChem = Left(ChemNom, Len(ChemNom) - InStr(1, StrReverse(ChemNom), "\", vbTextCompare))
+End Function
+'----------------------------------------------------------------------------------------------------------------------
+Sub tstBouton4()
+    If txtOuvrTbl.Value = "" Then
+        MsgBox "Le test d'ouverture de table ne peut être fait." & vbCrLf & "la boite de requête TABLE est vide", vbCritical, "Erreur"
+        Else
+        SQL = txtRqtConnx.Value
+        ConnBds
+        If Cnx.state = adStateOpen Then
+            SQL = txtOuvrTbl.Value
+            OuvreTbl
+            If Rst.state = adStateOpen Then
+                If Rst.EOF Then
+                    MsG = "Test Ok, mais aucun enregistrement disponnible" & vbCrLf
+                    MsgBox MsG, vbInformation, "Ouverture Table"
+                    Exit Sub
+                End If
+                NbrLgn = Int(NbrLgnTbl.Value)
+                If Rst.RecordCount > NbrLgn Then
+                    CreatTblMultiple
+                    Else
+                    CreatTbl
+                    Rst.Close: Set Rst = Nothing
+                    Cnx.Close: Set Cnx = Nothing
+                End If
+            End If
+        End If
+    End If
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub RecupeVBScript()
+    Const ForReading = 1
+    Set Fso = CreateObject("Scripting.FileSystemObject")
+    Set F = Fso.OpenTextFile(ChemFichierModel, ForReading)
+    ContenuLgn = Split(F.ReadAll, vbNewLine)
+    F.Close: Set F = Nothing
+    Set Fso = Nothing
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub CreatTblMultiple()
+Dim NumLgn, NbrPage, Ndeb, Nfin, NbrEnrg
+    DossierTemp = DossierDuProg: ChemFichierModel = ExtratChem(DossierDuProg) & "\StructGenTbl.hta"
+    SQLConnect = txtRqtConnx.Value: SQLTbl = txtOuvrTbl.Value
+'**********************************************************************************************************************
+    RecupeVBScript
+    MsGPage = ""
+    For T = 0 To 2: MsGPage = MsGPage & ContenuLgn(T) & vbCrLf: Next
+    MsGPage = MsGPage & "       id =" & Chr(34) & "GenTblMlt" & Chr(34) & vbCrLf
+    MsGPage = MsGPage & "       applicationname =" & Chr(34) & "GenTblMlt" & Chr(34) & vbCrLf
+    MsGPage = MsGPage & "       ICON =" & Chr(34) & "MultiTBLHTA.ico" & Chr(34) & vbCrLf
+    For T = 6 To 62: MsGPage = MsGPage & ContenuLgn(T) & vbCrLf: Next
+    MsGPage = MsGPage & "ChemFichierTemp = " & Chr(34) & ExtratChem(DossierDuProg) & "\GenTblMlt.hta" & Chr(34) & vbCrLf
+    MsGPage = MsGPage & "NomDeLaBDs = " & Chr(34) & NomDeLaBDs & Chr(34) & ": NomDeLaTable = " & Chr(34) & NomDeLaTable & Chr(34) & vbCrLf
+    MsGPage = MsGPage & "SQLConnect = " & Chr(34) & SQLConnect & Chr(34) & vbCrLf
+    MsGPage = MsGPage & "SQLTbl = " & Chr(34) & SQLTbl & Chr(34) & vbCrLf
+    MsGPage = MsGPage & "AffNbrLgn = " & NbrLgn & vbCrLf
+    For T = 69 To 143: MsGPage = MsGPage & ContenuLgn(T) & vbCrLf: Next
+Set Cnx = CreateObject("ADODB.Connection")
+Cnx.CursorLocation = adUseClient: Cnx.Mode = adModeReadWrite
+  Cnx.Open SQLConnect
+Set Rst = CreateObject("ADODB.Recordset")
+  Rst.Open SQLTbl, Cnx, adOpenStatic, adLockPessimistic
+NbrEnrg = Rst.RecordCount
+
+'-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*- partie <body> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+'infos nom de la BDs, nom de la table, N° enregistrement debut et fin pour la page à afficher
+Ndeb = 0: Nfin = NbrLgn - 1: NumLgn = 144
+MsGPage = MsGPage & Left(ContenuLgn(NumLgn), (InStr(1, ContenuLgn(NumLgn), "NomBDs", vbTextCompare) - 1)) & NomDeLaBDs & Right(ContenuLgn(NumLgn), 5) & vbCrLf
+MsGPage = MsGPage & Left(ContenuLgn(NumLgn + 1), (InStr(1, ContenuLgn(NumLgn + 1), "NomTable", vbTextCompare) - 1)) & NomDeLaTable & Right(ContenuLgn(NumLgn + 1), 5) & vbCrLf
+MsGPage = MsGPage & Left(ContenuLgn(NumLgn + 2), (InStr(1, ContenuLgn(NumLgn + 2), "LaRequete", vbTextCompare) - 1)) & SQLTbl & Right(ContenuLgn(NumLgn + 2), 9) & vbCrLf
+MsGPage = MsGPage & Left(ContenuLgn(NumLgn + 3), (InStr(1, ContenuLgn(NumLgn + 3), "N°Deb", vbTextCompare) - 1)) & Ndeb + 1 & Right(ContenuLgn(NumLgn + 3), 5) & vbCrLf
+MsGPage = MsGPage & Left(ContenuLgn(NumLgn + 4), (InStr(1, ContenuLgn(NumLgn + 4), "N°Fin", vbTextCompare) - 1)) & Nfin + 1 & Right(ContenuLgn(NumLgn + 4), 5) & vbCrLf
+MsGPage = MsGPage & Left(ContenuLgn(NumLgn + 5), (InStr(1, ContenuLgn(NumLgn + 5), "NbrTotal", vbTextCompare) - 1)) & NbrEnrg & Right(ContenuLgn(NumLgn + 5), 10) & vbCrLf
+MsGPage = MsGPage & ContenuLgn(NumLgn + 6) & vbCrLf
+MsGPage = MsGPage & ContenuLgn(NumLgn + 7) & vbCrLf
+
+'---TABLEAU---, titrage colonnes avec les noms de champs
+MsGPage = MsGPage & "        <td>&nbsp&nbsp</td>"
+For V = 0 To Rst.Fields.Count - 1: MsGPage = MsGPage & "<td>&nbsp" & Rst.Fields(V).Name & "&nbsp</td>": Next
+MsGPage = MsGPage & vbCrLf & "    </tr>"
+
+'ajout de chaque lignes et valeur de chaque enregistrements
+Rst.Move Ndeb, AdBookmarkFirst
+U = Nfin - Ndeb
+For V = 0 To U
+        If Not Rst.EOF Then
+            MsGPage = MsGPage & vbCrLf & "    <tr>" & vbCrLf & "        <td style=" & Chr(34) & "background-color:#E0E0E0;color:green" & Chr(34) & ">&nbsp" & V + 1 & "&nbsp</td>"
+            For T = 0 To Rst.Fields.Count - 1
+				If Rst.Fields(T).Type = 205 then 'adLongVarBinary exemple 10101010, pour 204 adVarBinary >>> erreur
+					On Error Resume Next: MsGPage = MsGPage & "<td>" & Cstr(Rst.Fields(T).GetChunk(1024)) & "</td>": If Err.Number <> 0 Then Err.Clear: MsGPage = MsGPage & "<td>?Err?</td>"
+					Else
+					On Error Resume Next: MsGPage = MsGPage & "<td>" & Rst.Fields(T) & "</td>": If Err.Number <> 0 Then Err.Clear: MsGPage = MsGPage & "<td>?Err?</td>"
+				End If
+            Next
+            MsGPage = MsGPage & vbCrLf & "    </tr>"
+        End If
+        If Rst.EOF Then Exit For Else Rst.MoveNext
+Next
+Rst.Close: Set Rst = Nothing
+Cnx.Close: Set Cnx = Nothing
+'--- Liens pour appel des pages suivantes ---
+NbrPage = Int((NbrEnrg - 1) / NbrLgn)
+T = (NbrEnrg - 1) / NbrLgn
+If T > NbrPage Then NbrPage = NbrPage + 1
+MsGPage = MsGPage & vbCrLf & "  <tr style=" & Chr(34) & "background-color:#E0E0E0" & Chr(34) & ">" & vbCrLf
+MsGPage = MsGPage & "       <td colspan=" & Chr(34) & NbrPage & Chr(34) & ">"
+For V = 1 To NbrPage
+    If V = 1 Then
+        MsGPage = MsGPage & vbCrLf & "         <span style=" & Chr(34) & "color:#788C8C" & Chr(34) & ">" & V & "</span>"
+        Else
+        If V <> NbrPage Then
+            MsGPage = MsGPage & vbCrLf & "         <a id=" & Chr(34) & "Lien" & V & Chr(34) & " style=" & Chr(34) & "color:blue;text-Decoration:underline" & Chr(34) _
+            & " Title=" & Chr(34) & "Enregistrements: " & (((V - 1) * NbrLgn) + 1) & "/" & (V * NbrLgn) & Chr(34) _
+            & " onClick=" & Chr(34) & "NewPage " & ((V - 1) * NbrLgn) & "," & ((V * NbrLgn) - 1) & Chr(34) _
+            & " onmouseover=" & Chr(34) & "MouseEnter(Lien" & V & ")" & Chr(34) _
+            & " onmouseout=" & Chr(34) & "MouseExit(Lien" & V & ")" & Chr(34) _
+            & ">" & V & "</a>"
+            Else
+            T = NbrEnrg
+            MsGPage = MsGPage & vbCrLf & "         <a id=" & Chr(34) & "Lien" & V & Chr(34) & " style=" & Chr(34) & "color:blue;text-Decoration:underline" & Chr(34) _
+            & " Title=" & Chr(34) & "Enregistrements: " & (((V - 1) * NbrLgn) + 1) & "/" & T & Chr(34) _
+            & " onClick=" & Chr(34) & "NewPage " & ((V - 1) * NbrLgn) & "," & T & Chr(34) _
+            & " onmouseover=" & Chr(34) & "MouseEnter(Lien" & V & ")" & Chr(34) _
+            & " onmouseout=" & Chr(34) & "MouseExit(Lien" & V & ")" & Chr(34) _
+            & ">" & V & "</a>"
+        End If
+    End If
+Next
+V = UBound(ContenuLgn) - 4
+For T = V To UBound(ContenuLgn): MsGPage = MsGPage & vbCrLf & ContenuLgn(T): Next
+'-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*- fin partie <body> -*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-
+EnregJouerTbl ExtratChem(DossierDuProg) & "\GenTblMlt.HTA"
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+Sub TestNbrLgnTbl()
+    BtTester4.Title = "Avec affichage du résultat de la requête, par lot de " & NbrLgnTbl.Value & " enregistrements"
+End Sub
+'----------------------------------------------------------------------------------------------------------------------
+</SCRIPT>
+
+<body style="margin: auto; margin-bottom: auto; margin-left: 10px; margin-right: 10px; margin-top: 10px; 
+	background-color: #FDFDE5; background-position: center; background: url(Fond.jpg); background-repeat: no-repeat">
+
+<!-- cartouche BDs (facultatif) -->
+	<select name="LstDsn" disabled="disabled" onchange="TestChekDSN" 
+		style="position: absolute; left: 10px; top: 118px; height:22px; width:267px">
+	<INPUT Type="checkbox" name="chkBDsDSN" disabled="disabled" onclick="TestChekDSN" 
+		style="position: absolute; left: 286px; top: 124px; height:13px; width:13px">
+	<INPUT Type="checkbox" name="chkBDsFichier" disabled="disabled" onClick="TestChekFichier" 
+		style="position: absolute; left: 326px; top: 124px; height:13px; width:13px">
+	<INPUT Type="file" name="NameBDs" title="Ouvrir une BDs" onchange="choixfichier"  
+		style="background-color: white; position: absolute; left: 347px; top: 118px; height:22px; width:440px">
+
+<!-- cartouche requête connexion à la BDs -->
+	<TEXTAREA name="txtRqtConnx"  onchange="VerifCnt" Value ="" 
+		style="background-color: powderblue; border-style: solid; position: absolute; left:12px; top: 226px; height:107px; width:707px"></TEXTAREA>
+	<INPUT Type="button" name="BtTester1" value="Tester" onClick="tstBouton1" 
+		style="position: absolute; left: 724px; top: 309px; height:24px; width:58px">
+
+<!-- cartouche requête table -->
+	<INPUT Type="checkbox" name="chkTbl"  disabled="disabled" onClick="TestChekTbl" title="Si coché, vérification/modification de la rédaction de la requête" 
+		style="position: absolute; left: 283px; top: 384px; height:13px; width:13px">
+	<SELECT name="LstTbl" disabled="disabled" onclick="TestChekTbl" 
+		style="position: absolute; left: 304px; top: 378px; height: 22px; width:207px"></SELECT>
+	<TEXTAREA name="txtOuvrTbl" id="txtOuvrTbl"
+		style="background-color: lightgreen; border-style: solid; position: absolute; left:12px; top: 425px; height:107px; width:707px"></TEXTAREA>
+	<INPUT Type="button" name="NbrTbl" id="NbrTbl"
+		style="background-color: #CCFF9A; border-style: none; position: absolute; left:360px; top: 358px; height:18px; width:40px">
+ 	<TEXTAREA name="txtLstChamps" id="txtLstChamps" onmouseover="MouseEnter(txtLstChamps)" onmouseout="MouseExit(txtLstChamps)" disabled="disabled"
+		style="position:absolute; left:512px; top:378px; height:22px; width:208px"></TEXTAREA>
+	<INPUT Type="button" name="NbrChamps" id="NbrChamps"
+		style="background-color: #CCFF9A; border-style: none; position: absolute; left:645px; top: 358px; height:18px; width:30px">
+	<INPUT Type="button" name="BtTester2" value="Tester" disabled="disabled" onClick="tstBouton2" title="Ne renseigne que sur le nombre d'enregistrements pouvant être retournée" 
+		style="position: absolute; left: 724px; top: 425px; height:24px; width:58px">
+	<INPUT Type="button" name="BtTester3" value="Test+" disabled="disabled" onClick="tstBouton3" title="Avec affichage du résultat de la requête sur une page"
+		style="position: absolute; left: 724px; top: 454px; height:24px; width:58px">
+	<INPUT Type="button" name="BtTester4" value="Test++" disabled="disabled" onClick="tstBouton4" title="Avec affichage du résultat de la requête, par lot de 25 enregistrements"
+		style="position: absolute; left: 724px; top: 483px; height:24px; width:58px">
+	<SELECT name="NbrLgnTbl"  onclick="TestNbrLgnTbl" title="Nbr. de lignes maximum par page tableau"
+		style="position: absolute; left: 724px; top: 508px; height:20px; width:58px">
+		<OPTION VALUE="25">25
+		<OPTION VALUE="30">30
+		<OPTION VALUE="35">35
+		<OPTION VALUE="40">40
+		<OPTION VALUE="45">45
+		<OPTION VALUE="50">50
+		<OPTION VALUE="55">55
+		<OPTION VALUE="60">60
+		<OPTION VALUE="65">65
+		<OPTION VALUE="70">70
+		<OPTION VALUE="75">75
+		<OPTION VALUE="80">80
+		<OPTION VALUE="85">85
+		<OPTION VALUE="90">90
+		<OPTION VALUE="95">95
+		<OPTION VALUE="100">100
+	</SELECT>
+
+</body> 
