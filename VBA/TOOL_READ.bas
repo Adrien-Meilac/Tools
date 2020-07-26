@@ -16,7 +16,7 @@ Public Function ReadArray(rng As Range) As Variant()
         X(i) = cell_value
         Increment i
     Next
-    ExtractArray = X
+    ReadArray = X
 End Function
 
 Public Function ReadArrayDouble(rng As Range) As Double()
@@ -28,5 +28,5 @@ Public Function ReadArrayDouble(rng As Range) As Double()
         X(i) = cell_value
         Increment i
     Next
-    ExtractArrayDouble = X
+    ReadArrayDouble = X
 End Function

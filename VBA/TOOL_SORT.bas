@@ -17,7 +17,7 @@ End Function
 Public Function QuickSortTable(ByRef t() As Variant, _
                                sortColumns As Variant)
     Call QuickSortTablePart(t, LBound(t), UBound(t), LBound(t, 2), UBound(t, 2), sortColumns)
-    QuickSortTablePart = t
+    QuickSortTable = t
 End Function
 
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''

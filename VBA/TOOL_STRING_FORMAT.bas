@@ -1,4 +1,4 @@
-Attribute VB_Name = "TOOL_FORMAT_STRING"
+Attribute VB_Name = "TOOL_STRING_FORMAT"
 'Version 1 (2019-04-30)
 'Contiens les fonctions
 '   -> Printf
@@ -16,11 +16,11 @@ As String
     Dim i_max As Long: i_max = UBound(tokens)
     If InStr(mask, "{}") < 0 Then
         For i = i_min To i_max
-            mask = Replace$(mask, "{" & i & "}", CStr(tokens(i)))
+            mask = replace$(mask, "{" & i & "}", CStr(tokens(i)))
         Next
     Else
         For i = i_min To i_max
-            mask = Replace$(mask, "{}", CStr(tokens(i)), Count:=1)
+            mask = replace$(mask, "{}", CStr(tokens(i)), Count:=1)
         Next
     End If
     Printf = mask
